@@ -1,0 +1,24 @@
+
+
+let previousDayJobId = toint(format_datetime(now(-7d), 'yyyyMMdd'));
+let CurrentDayJobId = iff(datetime_part("hour", now()) < 13, toint(format_datetime(now(-1d), 'yyyyMMdd')), toint(format_datetime(now(), 'yyyyMMdd')));
+let previousDayResults= AzSK_ADO_ControlResults_CL
+    | where TimeGenerated > ago(8d)
+        and JobId_d >= previousDayJobId
+        and JobId_d != CurrentDayJobId
+    //| summarize arg_max(TimeGenerated,*) by  OrganizationName_s;
+    | distinct OrganizationName_s
+    | count 
+    | extend dummy=1;
+let currentDayResults =AzSK_ADO_ControlResults_CL
+    | where TimeGenerated > ago(3d) and JobId_d == CurrentDayJobId
+    //| summarize arg_max(TimeGenerated,*) by  OrganizationName_s;
+    | distinct OrganizationName_s
+    | count 
+    | extend dummy=1;
+previousDayResults
+| join currentDayResults on dummy  //, ParentResourceName_s, ResourceId;
+| extend change = Count1 - Count
+| extend percentage = change * 100.0 / (Count * 1.0)
+| project PrevDayCount = Count, CurrentDayCount = Count1, change, percentage
+
